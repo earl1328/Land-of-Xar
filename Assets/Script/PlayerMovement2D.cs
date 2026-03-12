@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class PlayerMovement2D : MonoBehaviour
 {
@@ -9,11 +10,19 @@ public class PlayerMovement2D : MonoBehaviour
     public float jumpForce = 7f;
     public int maxJumps = 2;
 
+    [Header("Dash")]
+    public float dashVelocity = 20f;
+    public float dashDuration = 0.2f;
+    public float dashCooldown = 1f;
+
     private Rigidbody2D rb;
     private Animator anim;
 
     private float moveInput;
     private int jumpCount = 0;
+
+    private bool isDashing = false;
+    private bool canDash = true;
 
     void Start()
     {
@@ -25,13 +34,17 @@ public class PlayerMovement2D : MonoBehaviour
     {
         HandleInput();
         HandleJump();
+        HandleDash();
         HandleAnimation();
         HandleFlip();
     }
 
     void FixedUpdate()
     {
-        HandleMovement();
+        if (!isDashing)
+        {
+            HandleMovement();
+        }
     }
 
     // -------------------------
@@ -51,7 +64,7 @@ public class PlayerMovement2D : MonoBehaviour
     }
 
     // -------------------------
-    // Jump / Double Jump
+    // Jump
     // -------------------------
     void HandleJump()
     {
@@ -68,6 +81,39 @@ public class PlayerMovement2D : MonoBehaviour
     }
 
     // -------------------------
+    // Dash
+    // -------------------------
+    void HandleDash()
+    {
+        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash)
+        {
+            StartCoroutine(Dash());
+        }
+    }
+
+    IEnumerator Dash()
+    {
+        canDash = false;
+        isDashing = true;
+
+        float originalGravity = rb.gravityScale;
+        rb.gravityScale = 0f;
+
+        float dashDirection = transform.localScale.x;
+
+        rb.velocity = new Vector2(dashDirection * dashVelocity, 0f);
+
+        yield return new WaitForSeconds(dashDuration);
+
+        rb.gravityScale = originalGravity;
+        isDashing = false;
+
+        yield return new WaitForSeconds(dashCooldown);
+
+        canDash = true;
+    }
+
+    // -------------------------
     // Animation
     // -------------------------
     void HandleAnimation()
@@ -78,7 +124,6 @@ public class PlayerMovement2D : MonoBehaviour
         bool isFalling = rb.velocity.y < -0.1f;
         anim.SetBool("isFalling", isFalling);
 
-        // safer jump reset (instead of velocity == 0)
         if (Mathf.Abs(rb.velocity.y) < 0.05f)
         {
             jumpCount = 0;
@@ -86,7 +131,7 @@ public class PlayerMovement2D : MonoBehaviour
     }
 
     // -------------------------
-    // Flip Player
+    // Flip
     // -------------------------
     void HandleFlip()
     {
