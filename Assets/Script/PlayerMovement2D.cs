@@ -13,7 +13,6 @@ public class PlayerMovement2D : MonoBehaviour
     [Header("Dash")]
     public float dashVelocity = 20f;
     public float dashDuration = 0.2f;
-    public float dashCooldown = 1f;
 
     private Rigidbody2D rb;
     private Animator anim;
@@ -23,6 +22,9 @@ public class PlayerMovement2D : MonoBehaviour
 
     private bool isDashing = false;
     private bool canDash = true;
+
+    // ✅ Flip control
+    private bool facingRight = true;
 
     void Start()
     {
@@ -48,23 +50,16 @@ public class PlayerMovement2D : MonoBehaviour
     }
 
     // -------------------------
-    // Input
-    // -------------------------
     void HandleInput()
     {
         moveInput = Input.GetAxis("Horizontal");
     }
 
-    // -------------------------
-    // Movement
-    // -------------------------
     void HandleMovement()
     {
         rb.velocity = new Vector2(moveInput * moveSpeed, rb.velocity.y);
     }
 
-    // -------------------------
-    // Jump
     // -------------------------
     void HandleJump()
     {
@@ -81,11 +76,9 @@ public class PlayerMovement2D : MonoBehaviour
     }
 
     // -------------------------
-    // Dash
-    // -------------------------
     void HandleDash()
     {
-        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash)
+        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash && !isDashing)
         {
             StartCoroutine(Dash());
         }
@@ -100,44 +93,52 @@ public class PlayerMovement2D : MonoBehaviour
         rb.gravityScale = 0f;
 
         float dashDirection = transform.localScale.x;
-
         rb.velocity = new Vector2(dashDirection * dashVelocity, 0f);
 
         yield return new WaitForSeconds(dashDuration);
 
         rb.gravityScale = originalGravity;
         isDashing = false;
-
-        yield return new WaitForSeconds(dashCooldown);
-
-        canDash = true;
     }
 
-    // -------------------------
-    // Animation
     // -------------------------
     void HandleAnimation()
     {
-        bool isWalking = moveInput != 0;
-        anim.SetBool("isWalking", isWalking);
-
-        bool isFalling = rb.velocity.y < -0.1f;
-        anim.SetBool("isFalling", isFalling);
-
-        if (Mathf.Abs(rb.velocity.y) < 0.05f)
-        {
-            jumpCount = 0;
-        }
+        anim.SetBool("isWalking", Mathf.Abs(moveInput) > 0.01f);
+        anim.SetBool("isFalling", rb.velocity.y < -0.1f);
     }
 
     // -------------------------
-    // Flip
+    // ✅ FIXED FLIP SYSTEM
     // -------------------------
     void HandleFlip()
     {
-        if (moveInput > 0)
-            transform.localScale = new Vector3(1, 1, 1);
-        else if (moveInput < 0)
-            transform.localScale = new Vector3(-1, 1, 1);
+        if (moveInput > 0 && !facingRight)
+        {
+            Flip();
+        }
+        else if (moveInput < 0 && facingRight)
+        {
+            Flip();
+        }
+    }
+
+    void Flip()
+    {
+        facingRight = !facingRight;
+
+        Vector3 scale = transform.localScale;
+        scale.x *= -1;
+        transform.localScale = scale;
+    }
+
+    // -------------------------
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.contacts[0].normal.y > 0.5f)
+        {
+            jumpCount = 0;
+            canDash = true;
+        }
     }
 }
