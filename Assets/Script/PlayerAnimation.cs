@@ -75,9 +75,18 @@ public class PlayerAnimation : MonoBehaviour
     {
         jumpCount++;
 
+       
+        anim.ResetTrigger("Jump");
+       
+
         if (jumpCount == 1)
+        {
             anim.SetTrigger("Jump");
+        }
         else if (jumpCount == 2)
+        {
             anim.SetTrigger("DoubleJump");
+        }
     }
+
 }
