@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace TarodevController
+namespace VirController
 {
     /// <summary>
     /// VERY primitive animator example.

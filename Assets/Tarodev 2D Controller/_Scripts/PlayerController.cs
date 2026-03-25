@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace TarodevController
+namespace VirController
 {
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
     public class PlayerController : MonoBehaviour, IPlayerController
