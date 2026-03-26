@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class ScoreManager : MonoBehaviour
 {
@@ -12,7 +13,19 @@ public class ScoreManager : MonoBehaviour
 
     void Awake()
     {
-        SetupInstance();
+        // Persistent singleton
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+
+            // Subscribe to scene change
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     void Start()
@@ -20,16 +33,16 @@ public class ScoreManager : MonoBehaviour
         UpdateUI();
     }
 
-    void SetupInstance()
+    // Called every time a new scene is loaded
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (Instance == null)
+        // Try to find the TMP_Text in the new scene
+        if (scoreText == null)
         {
-            Instance = this;
+            scoreText = FindObjectOfType<TMP_Text>();
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+
+        UpdateUI();
     }
 
     public void AddScore(int amount)
@@ -40,6 +53,21 @@ public class ScoreManager : MonoBehaviour
 
     void UpdateUI()
     {
-        scoreText.text = "Score: " + score;
+        if (scoreText != null)
+        {
+            scoreText.text = "Score: " + score;
+        }
+    }
+
+    public void ResetScore()
+    {
+        score = 0;
+        UpdateUI();
+    }
+
+    void OnDestroy()
+    {
+        // Unsubscribe from scene change
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 }
