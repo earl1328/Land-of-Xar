@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
 
@@ -13,13 +13,11 @@ public class ScoreManager : MonoBehaviour
 
     void Awake()
     {
-        // Persistent singleton
+        // Singleton + persist
         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-
-            // Subscribe to scene change
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
         else
@@ -33,13 +31,25 @@ public class ScoreManager : MonoBehaviour
         UpdateUI();
     }
 
-    // Called every time a new scene is loaded
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // Try to find the TMP_Text in the new scene
-        if (scoreText == null)
+        // ❗ Do NOT show score in Main Menu
+        if (scene.name == "Main Menu")
         {
-            scoreText = FindObjectOfType<TMP_Text>();
+            scoreText = null;
+            return;
+        }
+
+        // ✅ Only find object tagged as ScoreText
+        GameObject obj = GameObject.FindGameObjectWithTag("ScoreText");
+
+        if (obj != null)
+        {
+            scoreText = obj.GetComponent<TMP_Text>();
+        }
+        else
+        {
+            scoreText = null;
         }
 
         UpdateUI();
@@ -51,6 +61,12 @@ public class ScoreManager : MonoBehaviour
         UpdateUI();
     }
 
+    public void ResetScore()
+    {
+        score = 0;
+        UpdateUI();
+    }
+
     void UpdateUI()
     {
         if (scoreText != null)
@@ -59,15 +75,8 @@ public class ScoreManager : MonoBehaviour
         }
     }
 
-    public void ResetScore()
-    {
-        score = 0;
-        UpdateUI();
-    }
-
     void OnDestroy()
     {
-        // Unsubscribe from scene change
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 }

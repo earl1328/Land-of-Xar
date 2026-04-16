@@ -6,7 +6,20 @@ namespace VirController
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
     public class PlayerController : MonoBehaviour, IPlayerController
     {
+        [Header("Stats")]
         [SerializeField] private ScriptableStats _stats;
+
+        [Header("Audio")]
+        [SerializeField] private AudioSource _audio;
+        [SerializeField] private AudioClip _jumpSfx;
+        [SerializeField] private AudioClip _doubleJumpSfx;
+
+        [Header("Footsteps")]
+        [SerializeField] private AudioClip _walkSfx;
+        [SerializeField] private float _footstepInterval = 0.35f;
+
+        private float _footstepTimer;
+
         private Rigidbody2D _rb;
         private Collider2D _col;
 
@@ -64,16 +77,12 @@ namespace VirController
             }
 
             if (_frameInput.JumpDown)
-            {
                 _jumpToConsume = true;
-                _timeJumpWasPressed = _time;
-            }
         }
 
         private void FixedUpdate()
         {
             CheckCollisions();
-
             HandleDash();
 
             if (!_isDashing)
@@ -81,13 +90,41 @@ namespace VirController
                 HandleJump();
                 HandleDirection();
                 HandleGravity();
+                HandleFootsteps(); // ✅ FOOTSTEPS ADDED HERE
             }
 
             ApplyMovement();
         }
 
-        #region DASH
+        #region AUDIO
+        private void PlaySfx(AudioClip clip)
+        {
+            if (clip == null || _audio == null) return;
+            _audio.PlayOneShot(clip);
+        }
+        #endregion
 
+        #region FOOTSTEPS
+        private void HandleFootsteps()
+        {
+            if (_grounded && Mathf.Abs(_frameVelocity.x) > 0.1f)
+            {
+                _footstepTimer -= Time.fixedDeltaTime;
+
+                if (_footstepTimer <= 0f)
+                {
+                    PlaySfx(_walkSfx);
+                    _footstepTimer = _footstepInterval;
+                }
+            }
+            else
+            {
+                _footstepTimer = 0f;
+            }
+        }
+        #endregion
+
+        #region DASH
         private void HandleDash()
         {
             if (!_isDashing && _frameInput.Dash && Time.time >= _nextDashTime)
@@ -111,16 +148,12 @@ namespace VirController
                 _dashTime -= Time.fixedDeltaTime;
 
                 if (_dashTime <= 0f)
-                {
                     _isDashing = false;
-                }
             }
         }
-
         #endregion
 
-        #region Collisions
-
+        #region COLLISIONS
         private float _frameLeftGrounded = float.MinValue;
         private bool _grounded;
 
@@ -137,23 +170,11 @@ namespace VirController
 
             int groundHits = _col.Cast(Vector2.down, filter, _hits, _stats.GrounderDistance);
             for (int i = 0; i < groundHits; i++)
-            {
-                if (_hits[i].normal.y > 0.5f)
-                {
-                    groundHit = true;
-                    break;
-                }
-            }
+                if (_hits[i].normal.y > 0.5f) groundHit = true;
 
             int ceilingHits = _col.Cast(Vector2.up, filter, _hits, _stats.GrounderDistance);
             for (int i = 0; i < ceilingHits; i++)
-            {
-                if (_hits[i].normal.y < -0.5f)
-                {
-                    ceilingHit = true;
-                    break;
-                }
-            }
+                if (_hits[i].normal.y < -0.5f) ceilingHit = true;
 
             if (ceilingHit)
                 _frameVelocity.y = Mathf.Min(0, _frameVelocity.y);
@@ -165,7 +186,7 @@ namespace VirController
                 _bufferedJumpUsable = true;
                 _endedJumpEarly = false;
 
-                _jumpCount = 0; // ✅ RESET DOUBLE JUMP
+                _jumpCount = 0;
 
                 GroundedChanged?.Invoke(true, Mathf.Abs(_frameVelocity.y));
             }
@@ -178,11 +199,9 @@ namespace VirController
 
             Physics2D.queriesStartInColliders = _cachedQueryStartInColliders;
         }
-
         #endregion
 
-        #region Jumping
-
+        #region JUMP
         private bool _jumpToConsume;
         private bool _bufferedJumpUsable;
         private bool _endedJumpEarly;
@@ -199,16 +218,17 @@ namespace VirController
 
             if (!_jumpToConsume && !HasBufferedJump) return;
 
-            // ✅ DOUBLE JUMP FIX
             if (_grounded || CanUseCoyote)
             {
                 ExecuteJump();
                 _jumpCount = 1;
+                PlaySfx(_jumpSfx);
             }
             else if (_jumpCount < 2)
             {
                 ExecuteJump();
                 _jumpCount++;
+                PlaySfx(_doubleJumpSfx);
             }
 
             _jumpToConsume = false;
@@ -220,20 +240,19 @@ namespace VirController
             _timeJumpWasPressed = 0;
             _bufferedJumpUsable = false;
             _coyoteUsable = false;
+
             _frameVelocity.y = _stats.JumpPower;
             Jumped?.Invoke();
         }
-
         #endregion
 
-        #region Movement
-
+        #region MOVEMENT
         private void HandleDirection()
         {
             if (_frameInput.Move.x == 0)
             {
-                var deceleration = _grounded ? _stats.GroundDeceleration : _stats.AirDeceleration;
-                _frameVelocity.x = Mathf.MoveTowards(_frameVelocity.x, 0, deceleration * Time.fixedDeltaTime);
+                var decel = _grounded ? _stats.GroundDeceleration : _stats.AirDeceleration;
+                _frameVelocity.x = Mathf.MoveTowards(_frameVelocity.x, 0, decel * Time.fixedDeltaTime);
             }
             else
             {
@@ -244,11 +263,9 @@ namespace VirController
                 );
             }
         }
-
         #endregion
 
-        #region Gravity
-
+        #region GRAVITY
         private void HandleGravity()
         {
             if (_grounded && _frameVelocity.y <= 0f)
@@ -257,19 +274,18 @@ namespace VirController
             }
             else
             {
-                var inAirGravity = _stats.FallAcceleration;
+                var gravity = _stats.FallAcceleration;
 
                 if (_endedJumpEarly && _frameVelocity.y > 0)
-                    inAirGravity *= _stats.JumpEndEarlyGravityModifier;
+                    gravity *= _stats.JumpEndEarlyGravityModifier;
 
                 _frameVelocity.y = Mathf.MoveTowards(
                     _frameVelocity.y,
                     -_stats.MaxFallSpeed,
-                    inAirGravity * Time.fixedDeltaTime
+                    gravity * Time.fixedDeltaTime
                 );
             }
         }
-
         #endregion
 
         private void ApplyMovement() => _rb.velocity = _frameVelocity;
@@ -293,8 +309,8 @@ namespace VirController
 
     public interface IPlayerController
     {
-        public event Action<bool, float> GroundedChanged;
-        public event Action Jumped;
-        public Vector2 FrameInput { get; }
+        event Action<bool, float> GroundedChanged;
+        event Action Jumped;
+        Vector2 FrameInput { get; }
     }
 }
